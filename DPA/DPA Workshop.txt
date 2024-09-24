@@ -1,0 +1,79 @@
+https://events.ccc.de/congress/2008/wiki/DPA_Workshop/index.html
+
+DPA Workshop
+by Thomas Eisenbarth and Timo Kasper
+
+The DPA Workshop offers the opportunity to learn about the magic of power analysis attacks, as demonstrated in our talk. The slides are available now, we had to cut them in three parts due to upload restrictions in the wiki: Part 1 Part 2 Part 3
+
+During the 25C3, we have measuring the power consumption of a KeeLoq implementation in Hardware HCS 301 data sheet and an AES (Advanced Encryption Standard) implementation running in software on a smartcard. The smartcard uses an 8-bit microcontroller internally and the implementation is similar to the ones here or here.
+
+For both devices, we generated uniformly distributed plain- or ciphertexts, and recorded the power consumption during the encryption (live at the 25C3), together with the respective plaintext or ciphertext. The data is made available below in the respective sections.
+
+We try to provide all the necessary content required for self-learning here (note: watch the updates...). While everyone is invited to start developing her/his own DPA implementation according to the instructions on this site, we will be available for practical help and hints in workshop room A03 on Day 3 at 23:00. There, we will also show all the necessary equipment and how the measurements are performed. Feel free to contact us anytime - especially if you miss certain infos while implementing your correlation DPA - contact info at our talk.
+
+[edit]General DPA Description
+The first steps of a DPA are always recording and aligning the power traces while an encryption is being performed. Additionally one needs to store either the ciphertext (output of the encryption algorithm) or the plaintext (input of the encryption algorithm), depending on which one is known and of the type of attack. We performed this step already for you. You will find the preprocessed traces together with the plaintexts in the AES section and KeeLoq section.
+
+The first task of a DPA program is to open the files and read the data into the program so it can be processed.
+
+
+
+For performing a correlation DPA, a power model of a key-dependent intermediate value is needed. In the talk this was the number of toggles in the state register of the KeeLoq implementation. Basically we need an intermediate value of the algorithm that 1. is key dependent, 2. changes with a known input or output of the cipher, and 3. can be predicted by combining the known I/O with a guess for the part of the key it depends on. We assume that when this predicted value is being processed, some information about it will be leaked in the power consumption which we measured.
+
+A simple (but usually quite effective) model for this leakage is given either by the Hamming Weight or by the Hamming Distance of the leaked value. The Hamming weight (HW(x)) is simply the number of ones of the binary representation of the value (a 7, written in binary format is a 0111. Hence the Hamming weight of 7 is 3). The Hamming weight model applies to many microcontrollers like the AES implementation of the smartcard used here. The Hamming distance is the Hamming weight of the difference of the current value x of a register and its previous value y. In other words it is the number of toggles in that register. Mathematically the Hamming distance is given as HW(x xor y). The Hamming distance model typically applies to registers of hardware implementations.
+
+
+
+Now we are prepared to run the DPA attack algorithm. A short description how to implement a correlation-based DPA attack can be fond in this compact DPA description. The basic idea is to correlate each trace to its hypothesized power consumption. We do this for each possible key guess and choose the one with the highest correlation.
+
+Some details including a short code example for modelling the power consumption in general can be found in the DPA Tutorial.
+
+[edit]AES on a smart card
+The Advanced Encryption Standard (AES) is probably the most widely used secure block cipher. Fortunately the FIPS provides very good documentation for the cipher. AES Documentation (FIPS 197)
+
+The smart card features an 8-bit AVR processor. The AES is implemented in software. The power model of choice is the Hamming weight (what about Hamming distance? Think about it) of a single byte, as this is the maximum the processor can process at any time instance.
+
+Fortunately the AES is a byte-oriented cipher, making the choice of a power model quite easy. Since we want to perform a known-plaintext attack, we take a closer look at the beginning of the cipher:
+
+AES begins by XORing the key to the plaintext. From a mathematical point of view this is a very smart thing to do, but it will actually facilitate our attack. Theoretically we can use the result of the XOR(plaintext,key) as our power model. For practical reasons, we go one step deeper into the cipher.
+
+The next step of the AES is the SUB_BYTES function. SUB_BYTES maps one byte to another byte, resulting in a high nonlinearity between the input byte and output byte, while maintaining reversibility. The most straightforward implementation is a look-up-table with 256 entries, typically called S-box (substitution box), one for each possible output of SUB_BYTES. The output is calculated by
+
+output = SUB_BYTES(key_byte xor plaintext_byte)
+
+The output of this SUB_BYTES is the classical point of attack for AES. The Hamming weight (HW(x)) of this output is what we will predict in the power model. Hence the power model of choice should be:
+
+HW(output) = HW(SUB_BYTES(key_byte XOR plaintext_byte))
+
+To build your power model, take the plaintext byte in the position of the key byte you want to determine (e.g. start with byte position 0, the first byte) and XOR-add it with a key guess (you will have to check all 256 key guesses and choose the one with the highest correlation), perform the SUB_BYTES (just google for AES S-box to find a C Implementation of the table lookup) and calculate the Hamming weight of the resulting output. Plugging this into the general DPA description above should get you there. Enjoy ;-)
+
+
+Measurements of the AES Smart Card
+
+The zipped folder contains 1000 power traces, containing one power value in exponential format in each line. Furthermore it contains one plaintext with one plaintext (16 char bytes) per line. Download it from here.
+
+[edit]KeeLoq Infos and Measurements
+Some information can be found in the Wikipedia entry of KeeLoq.
+
+Attacking HCS chips is very straightforward, as the behaviour of the hardware implementation of KeeLoq is identical for all different keys and plaintexts. The leakage is almost perfectly related to the state register of the cipher (see description of the cipher, e.g. here http://www.crypto.rub.de/imperia/md/content/texte/publications/conferences/crypto2008_keeloq.pdf or here http://eprint.iacr.org/2007/055.pdf). For analyzing remote controls, we target a KeeLoq ENcryption and know the ciphertexts, while the plaintexts remain in the remote - a plaintext is not required for the side-channel attack.
+
+
+For the power analysis, the following steps need to be undertaken:
+
+1. Model the KeeLoq encryption:
+1.1 Use google ('keeloq.c') to find a C source for KeeLoq.
+1.2 Modify the program code such that the content of the state register after each round of the algortihm is available
+1.3 For attacking hardware (as we do here), a Hamming distance model applies. Hence, extend your model to output the amount of TOGGLING ones or zeroes between two states - basically a bitwise XOR bewteen the state of round i and i+1.
+
+2. We attack the encryption, knowing the ciphertexts, hence the attack starts from round 528/527. Guess one or more (2,4,6) key bits and model the power leakage of the state register for each key candidate and each ciphertext - starting from the last round of the encryption, round 527-528. You will obtain some hypothesized power consumptions for each ciphertext, for example 4 per ciphertext in case you guess 2 key bits at a time or 16 per ciphertext if you guess 4 key bits at a time. Note that the 64 key bits are - according to the description of the cipher - re-used during the 528 rounds of the KeeLoq encryption. Hence, the first key bit that you hypothesize is key bit 15.
+
+3. Implement a correlation function, to compare the model with the measurements (equation for correlation dpa, e.g., see slides of the talk) - the more similar the measured trace is to the predicted/modeled one, the higher will the correleation coefficient be. The key guess with the highest correlation coefficient is the corrext one (very likely ;-) )
+
+
+4. if you have recovered the first x bits of the key, proceed with the attack starting from round 528-x, to recover the next sub-key, and so on until the full key is recovered.
+
+5. Check the found key with the test vectors (to come). Then send it to us so we can put you in the hall of fame :-)
+
+
+Measurements of HCS301 KeeLoq Hardware encoder online
+We have measured the power consumption, aligned the traces and then extracted the peaks for you, such that processing the whole attack in RAM should be possible: HCS301 - rar archive contains file ciphertext.txt with the ciphertexts ( Strings in Hex notation + '\n' ) for the respective PeakX.dat file. PeakX.dat are binary files containing the amplitudes of 1650 Peaks from measurement X, stored as double.

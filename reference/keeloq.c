@@ -7,8 +7,7 @@
  *  See http://www.keeloq.boom.ru/decryption.pdf for more details.
  *  KeeLoq algorithm itself is not patented.
 \*/
-#include "amx.h"
-
+#include <stdint.h>
 #define KeeLoq_NLF		0x3A5C742E
 #define bit(x,n)		(((x)>>(n))&1)
 #define g5(x,a,b,c,d,e)	(bit(x,a)+bit(x,b)*2+bit(x,c)*4+bit(x,d)*8+bit(x,e)*16)
