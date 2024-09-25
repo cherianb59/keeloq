@@ -1,0 +1,10 @@
+[Trace Management]
+tracefile0 = HCS301_shift_peak_data/traces/config_2016.08.27-16.32.00_.cfg
+enabled0 = True
+[ChipWhisperer]
+[[General Settings]]
+Project Name = Untitled
+Program Name = ChipWhisperer
+Project File Version = 1.00
+Project Author = Unknown
+Program Version = V3.1.10
